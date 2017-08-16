@@ -1,2 +1,3 @@
 # Utils
-utility scripts for daily usage
+
+Scripts for various tasks
