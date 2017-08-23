@@ -2,7 +2,6 @@
 
 # TODO: snooze
 # TODO: speakers even if aux
-# TODO: prompt segment
 
 import dateparser
 import argparse
@@ -18,6 +17,13 @@ import re
 DEFAULT_MUSIC_DIR = '/home/ketan/Windows/Music/'
 DEFAULT_SONG = 'singles/m_Bach_PreludeToPartitaNo3.mp3'
 DEFAULT_FONT = 'future'
+
+
+def prompt_segment_write(end_time):
+    now = datetime.datetime.now()
+    timefmt = '%I:%M %p' if now.day == end_time.day else '%I:%M %p, %d %b'
+    with open('/tmp/alarm', 'w') as fp:
+        fp.write(end_time.strftime(timefmt))
 
 
 def validate_song(args):
@@ -130,14 +136,14 @@ def change_vol(vol):
               stdout=proc.DEVNULL, stderr=proc.DEVNULL)
 
 
-def alert(stdscr, args):
+def alert(stdscr, args, oldwin):
     msg = args.msg if args.msg is not None else 'Time up!'
     if not args.silent:
         init_vol = get_curr_vol()
         change_vol(100)
         mplayer = proc.Popen('mplayer {0}'.format(args.song).split(),
                              stdout=proc.DEVNULL, stderr=proc.DEVNULL)
-        center(stdscr, msg, args.font, curses.color_pair(1))
+        center(stdscr, msg, args.font, curses.color_pair(1), oldwin)
         stdscr.getkey()
         mplayer.kill()
         change_vol(init_vol)
@@ -162,14 +168,13 @@ def countdown(stdscr, end_time, font, fg_color, bg_color, msg=None):
         sleep(1)
         now = datetime.datetime.now()
 
-    win.clear()
-    win.refresh()
-    alert(stdscr, args)
+    alert(stdscr, args, win)
 
 
 if __name__ == '__main__':
     args = parse_args()
     end_time = parse_time(args.time, not args.abs)
+    prompt_segment_write(end_time)
     try:
         curses.wrapper(countdown,
                        end_time,
