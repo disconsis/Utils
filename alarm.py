@@ -1,167 +1,175 @@
 #!/usr/bin/python3
+
+# TODO: snooze
 # TODO: speakers even if aux
-# TODO: fix song file checking
-# TODO: ncurses
-# TODO: put back volume setting
-# TODO: silent mode
 
-# Features:
-#   Relative and absolute times
-#   Popup message
-#   Snooze
-#   Song flexibility
-#   (mostly) PEP8-compliant
-
-import sys
+import dateparser
 import argparse
-import os
-import time
 import datetime
-import pyautogui
-
-HOME = "/home/ketan"
-MUSIC_DEFAULT_DIR = "/home/ketan/Windows/Music/"
-
-parser = argparse.ArgumentParser()
-parser.add_argument('-a', '--absolute', help='absolute time',
-                    action='store_true')
-parser.add_argument('-Y', '--year', type=int)
-parser.add_argument('-M', '--month', type=int)
-parser.add_argument('-D', '--day', type=int)
-parser.add_argument('-hr', '--hour', type=int)
-parser.add_argument('-m', '--minute', type=int)
-parser.add_argument('-s', '--second', type=int)
-parser.add_argument("-msg", "--message")
-parser.add_argument('-z', '--snooze', type=float, help="snooze time, in min")
-with open("{}/bin/default_alarm.txt".format(HOME), "r") as fp:
-    default_alarm = fp.read()
-parser.add_argument('-d', '--dir', help='base directory for songs',
-                    default=MUSIC_DEFAULT_DIR)
-parser.add_argument('--song',
-                    default=default_alarm,
-                    help="path of the song; base directory is ~/Windows/Music")
-parser.add_argument('-f',
-                    '--failsafe',
-                    action="store_true",
-                    help="alarm sounds in case of an error, if set")
-args = parser.parse_args()
-
-MUSIC_DIR = args.dir
+import curses
+from time import sleep
+import subprocess as proc
+import os
+from pyautogui import alert as tkalert
+import re
 
 
-def playAlarm(args):
-    os.system('amixer -D pulse sset Master 100% 1>/dev/null 2>&1')
-    cmd = "mplayer '{}{}' 1>/dev/null 2>&1".format(MUSIC_DIR, args.song[:-1])
-    os.system(cmd)
-    if args.message is not None:
-        pyautogui.alert(args.message)
-    if args.snooze is not None:
-        snooze_time = max(int(args.snooze * 60), 30)  # a min of 30 sec snooze
-        next_snooze = args.snooze / 2
-        cmd = "alarm -s {} -z {}".format(snooze_time, next_snooze)
-        os.system(cmd)
+DEFAULT_MUSIC_DIR = '/home/ketan/Windows/Music/'
+DEFAULT_SONG = 'singles/m_Bach_PreludeToPartitaNo3.mp3'
 
 
-try:
-    os.chdir(MUSIC_DIR)
-    # if not os.path.exists("'" + MUSIC_DIR + args.song[:-1] + "'"):
-    #     print("Didn't find that song... you sure you typed that in right?")
-    #     print("You gave me: " + "'" + MUSIC_DIR + args.song[:-1] + "'")
-    #     exit()
+def validate_song(args):
+    if not args.dir or not args.song:
+        raise ValueError('no song/dir provided')
+    dir_slash = (args.dir[-1] == '/')
+    song_slash = (args.song[0] == '/')
+    if dir_slash and song_slash:
+        song = args.dir[:-1] + args.song
+    elif dir_slash or song_slash:
+        song = args.dir + args.song
+    else:
+        song = args.dir + '/' + args.song
+    if not os.path.exists(song):
+        raise ValueError('provided song "{0}" is not valid'.format(song))
+    return song
 
-    if len(sys.argv) == 1:
-        parser.print_help()
-        exit()
 
-    if args.absolute:  # abs time
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-a', '--abs', action='store_true')
+    parser.add_argument('-f', '--font', default='future',
+                        choices=['ascii12', 'ascii9', 'bigascii12',
+                                 'bigascii9', 'bigmono12', 'bigmono9',
+                                 'circle', 'emboss', 'emboss2', 'future',
+                                 'letter', 'mono12', 'mono9', 'pagga',
+                                 'smascii12', 'smascii9', 'smblock',
+                                 'smbraille', 'smmono12', 'smmono9',
+                                 'wideterm'])
+    parser.add_argument('-m', '--msg', default=None)
+    # parser.add_argument('-z', '--snooze', type=float, default=2)
+    parser_volume = parser.add_mutually_exclusive_group()
+    parser_song = parser_volume.add_argument_group()
+    parser_song.add_argument('-d', '--dir', default=DEFAULT_MUSIC_DIR)
+    parser_song.add_argument('--song', default=DEFAULT_SONG)
+    parser_volume.add_argument('-ns', '--silent', action='store_true')
+    parser.add_argument('-fg', choices=['black', 'red', 'green', 'yellow',
+                                        'blue', 'magenta', 'cyan', 'white'],
+                        default='white')
+    parser.add_argument('-bg', choices=['black', 'red', 'green', 'yellow',
+                                        'blue', 'magenta', 'cyan', 'white'],
+                        default='black')
+    parser.add_argument('time', nargs='+')
+    args = parser.parse_args()
+    if not args.silent:
+        args.song = validate_song(args)
+    args.time = ' '.join(args.time)
+    color_mapping = {
+        'black': curses.COLOR_BLACK,
+        'red': curses.COLOR_RED,
+        'green': curses.COLOR_GREEN,
+        'yellow': curses.COLOR_YELLOW,
+        'blue': curses.COLOR_BLUE,
+        'magenta': curses.COLOR_MAGENTA,
+        'cyan': curses.COLOR_CYAN,
+        'white': curses.COLOR_WHITE,
+    }
+    args.fg = color_mapping[args.fg]
+    args.bg = color_mapping[args.bg]
+    return args
+
+
+def parse_time(input_time, delta):
+    if not delta:
+        return dateparser.parse(input_time)
+    else:
+        delta = dateparser.parse(input_time)
         now = datetime.datetime.now()
-        now_dt = now
-        date = list()
-        for arg in ("year", "month", 'day'):
-            if getattr(args, arg) is not None:
-                date.append(getattr(args, arg))
-            else:
-                date.append(getattr(now, arg))
-        for arg in ('hour', 'minute', 'second'):
-            if getattr(args, arg) is not None:
-                date.append(getattr(args, arg))
-            else:
-                date.append(0)
-        now = datetime.datetime(now.year,
-                                now.month,
-                                now.day,
-                                now.hour,
-                                now.minute,
-                                now.second)
-        try:
-            then = datetime.datetime(date[0],
-                                     date[1],
-                                     date[2],
-                                     date[3],
-                                     date[4],
-                                     date[5])
-        except ValueError:
-            print("You tried to set an UNACCEPTABLE date")
-            exit()
-        except Exception as err:
-            print("Couldn't set the date :/")
-            print(err)
-            exit()
-        if then <= now:
-            print("Can't change the past")
-            exit()
+        return now + datetime.timedelta(hours=delta.hour,
+                                        minutes=delta.minute)
 
-    else:  # rel time
-        now = time.time()
-        now_dt = datetime.datetime.now()
-        addtime = list()
-        for arg in ('year', 'month', 'day', 'hour', 'minute', 'second'):
-            if getattr(args, arg):
-                addtime.append(getattr(args, arg))
-            else:
-                addtime.append(0)
-        addedtime = (addtime[0] * 365 * 30 * 24 * 60 * 60   # year
-                     + addtime[1] * 30 * 24 * 60 * 60       # month
-                     + addtime[2] * 24 * 60 * 60            # day
-                     + addtime[3] * 60 * 60                 # hour
-                     + addtime[4] * 60                      # minute
-                     + addtime[5])                          # second
-        if addedtime <= 0:
-            print("Can't change the past")
-            exit()
-        then = datetime.datetime.fromtimestamp(now + addedtime)
 
-    try:
-        # for prompt segment
-        if then.day == now_dt.day or then.day - now_dt.day == 1:
-            fmt = "%I:%M %p"
-        elif then.year == now_dt.year:
-            fmt = "%d %b, %I:%M %p"
-        else:
-            fmt = "%d/%b/%Y, %I:%M %p"
-        with open('/tmp/alarm', 'w') as fp:
-            fp.write(then.strftime(fmt))
+def toilet(string, font):
+    prog = proc.Popen('toilet -f {0}'.format(font).split(),
+                      stdin=proc.PIPE, stdout=proc.PIPE)
+    b_out = prog.communicate(string.encode('utf-8'))
+    out = next(b.decode('utf-8') for b in b_out if b is not None)
+    return out.split('\n')
 
-        # for actual terminal printing
-        print('Alarm set for ' + then.strftime('%c'))
-        print('Time left:')
-        diff = ''
-        while datetime.datetime.now() < then:
-            print('\b' * len(diff), end='')
-            diff = str(then - datetime.datetime.now()).split('.')[0].rjust(50)
-            print(diff, end='', flush=True)
-            time.sleep(1)
 
-        print('\b' * len(diff), end='')
-        print('  ' * len(diff), end='')
-        print('\b' * len(diff), end='')
-        print('Time\'s up!')
-        playAlarm(args)
-    except KeyboardInterrupt as err:
-        print('\nAlarm stopped'.rjust(50))
+def center(stdscr, string, font, color_pair):
+    out = toilet(string, font)
+    out_cols = max([len(line) for line in out])
+    out_lines = len(out)
+    win = curses.newwin(out_lines, out_cols,
+                        (curses.LINES - out_lines)//2,
+                        (curses.COLS - out_cols)//2)
+    for li, line in enumerate(out):
+        win.addstr(li, 0, line, color_pair)
+    win.refresh()
+    return win
 
-except Exception as err:
-    print('Something fucked up')
-    print(err)
-    if args.failsafe:
-        playAlarm(args)
+
+def get_curr_vol():
+    mixer_settings = proc.check_output(
+        'amixer -D pulse sget Master'.split()
+    ).decode('utf-8').split('\n')
+    r = re.compile(r'\[(\d+)%\]')
+    # curr_vol = max(int(r.search(line).group(1)) for line in mixer_settings)
+    re_vols = [r.search(line) for line in mixer_settings]
+    curr_vol = max(int(m.group(1)) for m in re_vols if m is not None)
+    return int(curr_vol)
+
+
+def change_vol(vol):
+    proc.call('amixer -D pulse sset Master {0}%'.format(str(vol)).split(),
+              stdout=proc.DEVNULL, stderr=proc.DEVNULL)
+
+
+def alert(stdscr, args):
+    msg = args.msg if args.msg is not None else 'Time up!'
+    if not args.silent:
+        init_vol = get_curr_vol()
+        change_vol(100)
+        mplayer = proc.Popen('mplayer {0}'.format(args.song).split(),
+                             stdout=proc.DEVNULL, stderr=proc.DEVNULL)
+        center(stdscr, msg, args.font, curses.color_pair(1))
+        stdscr.getkey()
+        mplayer.kill()
+        change_vol(init_vol)
+    else:
+        tkalert(msg)
+
+
+def countdown(stdscr, end_time, font, fg_color, bg_color, msg=None):
+    stdscr.clear()
+    curses.curs_set(False)
+    curses.init_pair(1, fg_color, bg_color)
+
+    now = datetime.datetime.now()
+    timefmt = '%I:%M %p' if now.day == end_time.day else '%I:%M %p, %d %b'
+    stdscr.addstr(0, 0, 'Alarm set for: ' + end_time.strftime(timefmt))
+    stdscr.refresh()
+
+    win = None
+    while now < end_time:
+        time_left = str(end_time - now).split('.')[0]
+        if win is not None:
+            win.clear()
+            win.refresh()
+        win = center(stdscr, time_left, font, curses.color_pair(1))
+        sleep(1)
+        now = datetime.datetime.now()
+
+    win.clear()
+    win.refresh()
+    alert(stdscr, args)
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    end_time = parse_time(args.time, not args.abs)
+    curses.wrapper(countdown,
+                   end_time,
+                   font=args.font,
+                   fg_color=args.fg, bg_color=args.bg,
+                   msg=args.msg if not args.silent else None)
