@@ -2,6 +2,7 @@
 
 # TODO: snooze
 # TODO: speakers even if aux
+# TODO: prompt segment
 
 import dateparser
 import argparse
@@ -16,6 +17,7 @@ import re
 
 DEFAULT_MUSIC_DIR = '/home/ketan/Windows/Music/'
 DEFAULT_SONG = 'singles/m_Bach_PreludeToPartitaNo3.mp3'
+DEFAULT_FONT = 'future'
 
 
 def validate_song(args):
@@ -37,7 +39,7 @@ def validate_song(args):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', '--abs', action='store_true')
-    parser.add_argument('-f', '--font', default='future',
+    parser.add_argument('-f', '--font', default=DEFAULT_FONT,
                         choices=['ascii12', 'ascii9', 'bigascii12',
                                  'bigascii9', 'bigmono12', 'bigmono9',
                                  'circle', 'emboss', 'emboss2', 'future',
@@ -96,13 +98,16 @@ def toilet(string, font):
     return out.split('\n')
 
 
-def center(stdscr, string, font, color_pair):
+def center(stdscr, string, font, color_pair, oldwin):
     out = toilet(string, font)
     out_cols = max([len(line) for line in out])
     out_lines = len(out)
     win = curses.newwin(out_lines, out_cols,
                         (curses.LINES - out_lines)//2,
                         (curses.COLS - out_cols)//2)
+    if oldwin is not None:
+        oldwin.clear()
+        oldwin.refresh()
     for li, line in enumerate(out):
         win.addstr(li, 0, line, color_pair)
     win.refresh()
@@ -153,10 +158,7 @@ def countdown(stdscr, end_time, font, fg_color, bg_color, msg=None):
     win = None
     while now < end_time:
         time_left = str(end_time - now).split('.')[0]
-        if win is not None:
-            win.clear()
-            win.refresh()
-        win = center(stdscr, time_left, font, curses.color_pair(1))
+        win = center(stdscr, time_left, font, curses.color_pair(1), win)
         sleep(1)
         now = datetime.datetime.now()
 
@@ -168,8 +170,11 @@ def countdown(stdscr, end_time, font, fg_color, bg_color, msg=None):
 if __name__ == '__main__':
     args = parse_args()
     end_time = parse_time(args.time, not args.abs)
-    curses.wrapper(countdown,
-                   end_time,
-                   font=args.font,
-                   fg_color=args.fg, bg_color=args.bg,
-                   msg=args.msg if not args.silent else None)
+    try:
+        curses.wrapper(countdown,
+                       end_time,
+                       font=args.font,
+                       fg_color=args.fg, bg_color=args.bg,
+                       msg=args.msg if not args.silent else None)
+    except KeyboardInterrupt:
+        exit(0)
