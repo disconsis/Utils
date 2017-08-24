@@ -36,7 +36,7 @@ def test(test_ips=['10.1.1.11', '10.1.1.19', '10.1.1.45'], timeout=3):
 
 def change_ip():
     logger = logging.getLogger(__name__)
-    logger.info('internet not working')
+    logger.warning('internet not working')
     working = False
     if os.path.exists(HOSTS_FILE_LOC):
         logger.debug('hosts file found')
@@ -62,10 +62,10 @@ def change_ip():
         for i in range(2, 255):
             host = '10.9.11.{i}'.format(i=i)
             change_router_ip(host)
-            logger.debug('trying ip {0}'.format(host))
+            logger.info('trying ip {0}'.format(host))
             if test():
-                logger.debug('ip {0} free'.format(host))
-                logger.info('changed ip to {0}'.format(host))
+                logger.info('ip {0} free'.format(host))
+                logger.warning('changed ip to {0}'.format(host))
                 working = True
                 break
 
@@ -88,9 +88,12 @@ def main(timeout=3):
                 times_working = 1
             if times_working == 1:
                 logger.debug('writing free hosts to file')
-                find_hosts_main(used=False, sort=False, store=HOSTS_FILE_LOC,
-                                timeout=timeout)
-                logger.debug('free hosts written to file')
+                # no interrupt
+                t = threading.Thread(target=find_hosts_main,
+                                     args=(False, False, HOSTS_FILE_LOC,
+                                           timeout))
+                t.start()
+                t.join()
 
         sleep(2)
 
