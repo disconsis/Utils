@@ -141,7 +141,7 @@ def alert(stdscr, args, oldwin):
     if not args.silent:
         init_vol = get_curr_vol()
         change_vol(100)
-        mplayer = proc.Popen('mplayer {0}'.format(args.song).split(),
+        mplayer = proc.Popen('mplayer -loop 0 {0}'.format(args.song).split(),
                              stdout=proc.DEVNULL, stderr=proc.DEVNULL)
         center(stdscr, msg, args.font, curses.color_pair(1), oldwin)
         stdscr.getkey()
