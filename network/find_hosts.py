@@ -9,6 +9,7 @@ import pickle
 
 
 def ping(ip, timeout):
+    "returns True if ping succeeds"
     ret = proc.run('ping -c 1 -W {t} {ip}'.format(t=timeout, ip=ip).split(),
                    stdout=proc.DEVNULL).returncode
     return not bool(ret)

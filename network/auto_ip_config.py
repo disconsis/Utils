@@ -8,15 +8,30 @@ import random
 from time import sleep
 import logging
 import argparse
+import threading
 
 
 HOSTS_FILE_LOC = '/tmp/hosts.pickle'
 
 
-def test(timeout=3):
-    return ping('10.1.1.19', timeout) \
-        or ping('10.1.1.45', timeout) \
-        or ping('10.1.1.11', timeout)
+def test_thread_worker(ip, timeout, _list):
+    ret = ping(ip, timeout)
+    if ret is True:
+        _list.append(ip)
+
+
+def test(test_ips=['10.1.1.11', '10.1.1.19', '10.1.1.45'], timeout=3):
+    "return True if any of the ips in test_ips is pingable"
+    main_thread = threading.currentThread()
+    working = []
+    for ip in test_ips:
+        threading.Thread(target=test_thread_worker,
+                         args=(ip, timeout, working)).start()
+    for thread in threading.enumerate():
+        if thread is main_thread:
+            continue
+        thread.join()
+    return bool(len(working))
 
 
 def change_ip():
