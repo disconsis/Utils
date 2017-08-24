@@ -77,7 +77,7 @@ def main(timeout=3):
     logger = logging.getLogger(__name__)
     times_working = 0
     while True:
-        if test(timeout) is False:
+        if test(timeout=timeout) is False:
             times_working = 0
             change_ip()
 
