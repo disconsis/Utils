@@ -36,7 +36,7 @@ def test(test_ips=['10.1.1.11', '10.1.1.19', '10.1.1.45'], timeout=3):
 
 def change_ip():
     logger = logging.getLogger(__name__)
-    logger.info('internet not working')
+    logger.warning('internet not working')
     working = False
     if os.path.exists(HOSTS_FILE_LOC):
         logger.debug('hosts file found')
@@ -47,10 +47,10 @@ def change_ip():
         for index in index_list:
             host = host_list[index]
             change_router_ip(host)
-            logger.debug('trying ip {0}'.format(host))
+            logger.info('trying ip {0}'.format(host))
             if test():
-                logger.debug('ip {0} free'.format(host))
-                logger.info('changed ip to {0}'.format(host))
+                logger.info('ip {0} free'.format(host))
+                logger.warning('changed ip to {0}'.format(host))
                 working = True
                 break
         else:
@@ -62,15 +62,15 @@ def change_ip():
         for i in range(2, 255):
             host = '10.9.11.{i}'.format(i=i)
             change_router_ip(host)
-            logger.debug('trying ip {0}'.format(host))
+            logger.info('trying ip {0}'.format(host))
             if test():
-                logger.debug('ip {0} free'.format(host))
-                logger.info('changed ip to {0}'.format(host))
+                logger.info('ip {0} free'.format(host))
+                logger.warning('changed ip to {0}'.format(host))
                 working = True
                 break
 
     if working is False:
-        logger.debug('No free hosts found')
+        logger.critical('No free hosts found')
 
 
 def main(timeout=3):
