@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+
+import proxy_handler
+from sys import argv
+
+if __name__ == "__main__":
+    assert len(argv) == 2
+    for proxy in proxy_handler.proxy_list:
+        if proxy.user == argv[1]:
+            proxy_handler.change_proxy(proxy)
+            break
+    else:
+        print('no such proxy found')

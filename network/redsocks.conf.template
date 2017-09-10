@@ -1,0 +1,72 @@
+base {
+	log_debug = on;
+	log_info = on;
+	/* possible `log' values are:
+	 *   stderr
+	 *   "file:/path/to/file"
+	 *   syslog:FACILITY  facility is any of "daemon", "local0"..."local7"
+	 */
+	log = "file:/tmp/redsocks.log";
+	daemon = on;
+	/* Change uid, gid and root directory, these options require root privileges on startup.
+	 * Note, your chroot may requre /etc/localtime if you write log to syslog.
+	 * Log is opened before chroot & uid changing.
+	 */
+	user = redsocks;
+	group = redsocks;
+	// chroot = "/var/chroot";
+	redirector = iptables;
+}
+
+redsocks {
+	/* `local_ip' defaults to 127.0.0.1 for security reasons, use 0.0.0.0 if you want to listen on every interface.
+	 * `local_*' are used as port to redirect to. */
+	local_ip = 127.0.0.1;
+	local_port = 12345;
+	// `ip' and `port' are IP and tcp-port of proxy-server
+	ip = ${proxy_addr};
+	port = ${proxy_port};
+	// known types: socks4, socks5, http-connect, http-relay
+	type = http-relay;
+	login = "${proxy_user}";
+	password = "${proxy_pass}";
+}
+
+redsocks {
+	local_ip = 127.0.0.1;
+	local_port = 12346;
+	ip = ${proxy_addr};
+	port = ${proxy_port};
+	type = http-connect;
+	login = "${proxy_user}";
+	password = "${proxy_pass}";
+}
+
+redudp {
+    // FIXME
+	local_ip = 127.0.0.1;
+	local_port = 10053;
+	ip = ${proxy_addr};
+	port = ${proxy_port};
+	login = "${proxy_user}";
+	password = "${proxy_pass}";
+	// kernel does not give us this information, so we have to duplicate it
+	// in both iptables rules and configuration file.  By the way, you can
+	// set `local_ip' to 127.45.67.89 if you need more than 65535 ports to
+	// forward ;-)
+	// This limitation may be relaxed in future versions using contrack-tools.
+	dest_ip = 192.0.2.2;
+	dest_port = 53;
+	udp_timeout = 30;
+	udp_timeout_stream = 180;
+}
+
+dnstc {
+	// fake and really dumb DNS server that returns "truncated answer" to
+	// every query via UDP, RFC-compliant resolver should repeat same query
+	// via TCP in this case.
+	local_ip = 127.0.0.1;
+	local_port = 5300;
+}
+// you can add more `redsocks' and `redudp' sections if you need.
+// vim: ft=c
