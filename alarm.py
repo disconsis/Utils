@@ -44,7 +44,8 @@ def validate_song(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--abs', action='store_true')
+    # parser.add_argument('-a', '--abs', action='store_true')
+    parser.add_argument('abs_rel', choices=['at', 'after'])
     parser.add_argument('-f', '--font', default=DEFAULT_FONT,
                         choices=['ascii12', 'ascii9', 'bigascii12',
                                  'bigascii9', 'bigmono12', 'bigmono9',
@@ -68,6 +69,7 @@ def parse_args():
                         default='black')
     parser.add_argument('time', nargs='+')
     args = parser.parse_args()
+    args.abs = False if args.abs_rel == 'after' else True
     if not args.silent:
         args.song = validate_song(args)
     args.time = ' '.join(args.time)
