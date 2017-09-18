@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+# FIXME: getkey() doesn't block if a key is pressed before the call
 # TODO: snooze
 # TODO: speakers even if aux
 

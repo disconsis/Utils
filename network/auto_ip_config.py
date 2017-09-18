@@ -9,6 +9,7 @@ from time import sleep
 import logging
 import argparse
 import threading
+import requests.exceptions.ConnectionError
 
 
 HOSTS_FILE_LOC = '/tmp/hosts.pickle'
@@ -46,7 +47,11 @@ def change_ip():
             random.shuffle(index_list)
         for index in index_list:
             host = host_list[index]
-            change_router_ip(host)
+            try:
+                change_router_ip(host)
+            except requests.exceptions.ConnectionError:
+                logger.critical('cannot contact router')
+                return False
             logger.info('trying ip {0}'.format(host))
             if test():
                 logger.info('ip {0} free'.format(host))
@@ -72,6 +77,8 @@ def change_ip():
     if working is False:
         logger.critical('No free hosts found')
 
+    return True
+
 
 def main(timeout=3):
     logger = logging.getLogger(__name__)
@@ -79,7 +86,8 @@ def main(timeout=3):
     while True:
         if test(timeout=timeout) is False:
             times_working = 0
-            change_ip()
+            while not change_ip():
+                sleep(5)
 
         else:
             logger.debug('internet working')
@@ -97,12 +105,16 @@ def main(timeout=3):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action='store_true')
+    verbosity_group = parser.add_mutually_exclusive_group()
+    verbosity_group.add_argument('-v', '--verbose', action='store_true')
+    verbosity_group.add_argument('-q', '--quiet', action='store_true')
     args = parser.parse_args()
 
     logger = logging.getLogger(__name__)
     if args.verbose is True:
         logger.setLevel(logging.DEBUG)
+    elif args.quiet is True:
+        logger.setLevel(logging.WARNING)
     else:
         logger.setLevel(logging.INFO)
     logging.basicConfig(format='%(levelname)-8s - %(asctime)s - %(message)s',
