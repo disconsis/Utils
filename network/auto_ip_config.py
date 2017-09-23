@@ -9,7 +9,7 @@ from time import sleep
 import logging
 import argparse
 import threading
-import requests.exceptions.ConnectionError
+from requests.exceptions import ConnectionError
 
 
 HOSTS_FILE_LOC = '/tmp/hosts.pickle'
@@ -49,7 +49,7 @@ def change_ip():
             host = host_list[index]
             try:
                 change_router_ip(host)
-            except requests.exceptions.ConnectionError:
+            except ConnectionError:
                 logger.critical('cannot contact router')
                 return False
             logger.info('trying ip {0}'.format(host))
@@ -80,7 +80,7 @@ def change_ip():
     return True
 
 
-def main(timeout=3):
+def main(timeout):
     logger = logging.getLogger(__name__)
     times_working = 0
     while True:
@@ -108,6 +108,7 @@ if __name__ == '__main__':
     verbosity_group = parser.add_mutually_exclusive_group()
     verbosity_group.add_argument('-v', '--verbose', action='store_true')
     verbosity_group.add_argument('-q', '--quiet', action='store_true')
+    parser.add_argument('-t', '--timeout', type=float, default=3)
     args = parser.parse_args()
 
     logger = logging.getLogger(__name__)
@@ -119,4 +120,4 @@ if __name__ == '__main__':
         logger.setLevel(logging.INFO)
     logging.basicConfig(format='%(levelname)-8s - %(asctime)s - %(message)s',
                         datefmt='%I:%M:%S %p')
-    main(timeout=3)
+    main(timeout=args.timeout)
