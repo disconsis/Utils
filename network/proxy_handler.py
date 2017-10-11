@@ -1,18 +1,17 @@
 #!/usr/bin/python3
 
+# FIXME: change on proxy error
+
 import requests
 from bs4 import BeautifulSoup
 import threading
 import logging
 import subprocess as proc
-import os
-import pickle
 from time import sleep
 from mako.template import Template
 from auto_ip_config import test as test_ip
 
 
-SAVE_FILE = '/tmp/curr_proxy.pickle'
 CONF_TEMPLATE = '/home/ketan/.redsocks/redsocks.conf.template'
 CONF_FILE = '/home/ketan/.redsocks/redsocks.conf'
 
@@ -30,10 +29,14 @@ class ProxyEntry():
 
 
 proxy_list = (
-    # feed your proxy list here:
-    # ProxyEntry('proxy_addr', 'proxy_port', 'proxy_user', 'proxy_password'),
+    # proxy list goes here
+    # ProxyEntry('server addr', 'port', 'username', 'password'),
 )
-addr_preference = ('10.1.1.19', '10.1.1.45')
+addr_preference = ['10.1.1.19', '10.1.1.18', '10.1.1.45']
+
+for entry in proxy_list:
+    if entry.addr not in addr_preference:
+        addr_preference.append(entry.addr)
 
 
 def usage_order(proxy_addr):
@@ -72,10 +75,13 @@ def find_free_proxies(url='http://icanhazip.com/'):
 
 def test_proxy(proxy, url='http://icanhazip.com'):
     logger = logging.getLogger(__name__)
-    proxy_url = 'http://{}:{}@{}:{}/'.format(proxy.user, proxy.pwd,
-                                             proxy.addr, proxy.port)
+    if proxy is not None:
+        proxy_url = ('http://{}:{}@{}:{}/'.format(proxy.user, proxy.pwd,
+                                                  proxy.addr, proxy.port)
+                     if proxy is not None else None)
     try:
-        r = requests.get(url, proxies={'http': proxy_url, 'https': proxy_url})
+        r = (requests.get(url, proxies={'http': proxy_url, 'https': proxy_url})
+             if proxy is not None else requests.get(url))
         r.raise_for_status()
     except Exception as err:
         logger.debug('{} failed'.format(proxy))
@@ -130,22 +136,13 @@ def simple_proxy_pref(free_proxies):
 
 def main(url='http://icanhazip.com'):
     logger = logging.getLogger(__name__)
-    if os.path.exists(SAVE_FILE):
-        logger.debug('found save file')
-        try:
-            with open(SAVE_FILE, 'rb') as fp:
-                curr_proxy = pickle.load(fp)
-        except Exception as err:
-            os.remove(SAVE_FILE)
-            logger.critical('bad save file: {}'.format(err))
-        else:
-            while not test_ip():
-                sleep(0.5)
-            if test_proxy(curr_proxy, url) is True:
-                logger.debug('current proxy working')
-                return
-            else:
-                logger.warning('current proxy not working')
+    while not test_ip():
+        sleep(0.5)
+    if test_proxy(proxy=None, url=url) is True:
+        logger.debug('current proxy working')
+        return
+    else:
+        logger.warning('current proxy not working')
     while not test_ip():
         sleep(0.5)
     while True:
@@ -155,13 +152,6 @@ def main(url='http://icanhazip.com'):
         sleep(5)
     new_proxy = simple_proxy_pref(free_proxies)
     change_proxy(new_proxy)
-    try:
-        with open(SAVE_FILE, 'wb') as fp:
-            pickle.dump(free_proxies[0], fp)
-    except Exception as err:
-        logger.critical('failed to write current proxy to file: {}'.format(err))
-    else:
-        logger.debug('wrote current proxy to file')
 
 
 if __name__ == '__main__':

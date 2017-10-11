@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-# FIXME: getkey() doesn't block if a key is pressed before the call
 # TODO: snooze
 # TODO: speakers even if aux
 
@@ -47,14 +46,10 @@ def parse_args():
     parser = argparse.ArgumentParser()
     # parser.add_argument('-a', '--abs', action='store_true')
     parser.add_argument('abs_rel', choices=['at', 'after'])
+    font_choices = [font[:font.rindex('.')]
+                    for font in os.listdir('/usr/share/figlet')]
     parser.add_argument('-f', '--font', default=DEFAULT_FONT,
-                        choices=['ascii12', 'ascii9', 'bigascii12',
-                                 'bigascii9', 'bigmono12', 'bigmono9',
-                                 'circle', 'emboss', 'emboss2', 'future',
-                                 'letter', 'mono12', 'mono9', 'pagga',
-                                 'smascii12', 'smascii9', 'smblock',
-                                 'smbraille', 'smmono12', 'smmono9',
-                                 'wideterm'])
+                        choices=font_choices)
     parser.add_argument('-m', '--msg', default=None)
     # parser.add_argument('-z', '--snooze', type=float, default=2)
     parser_volume = parser.add_mutually_exclusive_group()
@@ -93,10 +88,7 @@ def parse_time(input_time, delta):
     if not delta:
         return dateparser.parse(input_time)
     else:
-        delta = dateparser.parse(input_time)
-        now = datetime.datetime.now()
-        return now + datetime.timedelta(hours=delta.hour,
-                                        minutes=delta.minute)
+        return dateparser.parse(input_time.rstrip() + ' from now')
 
 
 def toilet(string, font):
@@ -128,7 +120,6 @@ def get_curr_vol():
         'amixer -D pulse sget Master'.split()
     ).decode('utf-8').split('\n')
     r = re.compile(r'\[(\d+)%\]')
-    # curr_vol = max(int(r.search(line).group(1)) for line in mixer_settings)
     re_vols = [r.search(line) for line in mixer_settings]
     curr_vol = max(int(m.group(1)) for m in re_vols if m is not None)
     return int(curr_vol)
@@ -147,6 +138,7 @@ def alert(stdscr, args, oldwin):
         mplayer = proc.Popen('mplayer -loop 0 {0}'.format(args.song).split(),
                              stdout=proc.DEVNULL, stderr=proc.DEVNULL)
         center(stdscr, msg, args.font, curses.color_pair(1), oldwin)
+        curses.flushinp()
         stdscr.getkey()
         mplayer.kill()
         change_vol(init_vol)
