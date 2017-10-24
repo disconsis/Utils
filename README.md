@@ -68,3 +68,6 @@ switches proxy on encountering proxy errors
 **human\_red\_out.py**  
 formats redsocks logs for human consumption  
 Usage: `$ tail -f <redsocks log file> | human_red_out.py`
+
+### keepalive.py
+automates the keepalive process for IIT-BHU's internet  
