@@ -48,6 +48,8 @@ def main():
 
 
 def read_auth():
+    global USERNAME
+    global PASSWORD
     USERNAME = input('username: ')
     PASSWORD = getpass('password: ')
 
