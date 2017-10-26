@@ -46,8 +46,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
     # parser.add_argument('-a', '--abs', action='store_true')
     parser.add_argument('abs_rel', choices=['at', 'after'])
-    font_choices = [font[:font.rindex('.')]
-                    for font in os.listdir('/usr/share/figlet')]
+    font_choices = [font.split('.')[0]
+                    for font in os.listdir('/usr/share/figlet')
+                    if font.split('.')[1] == 'tlf']
     parser.add_argument('-f', '--font', default=DEFAULT_FONT,
                         choices=font_choices)
     parser.add_argument('-m', '--msg', default=None)
