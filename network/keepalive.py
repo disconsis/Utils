@@ -5,67 +5,74 @@ from getpass import getpass
 from bs4 import BeautifulSoup
 from time import sleep
 
+# change these to avoid reading from stdin each time
 USERNAME = None
 PASSWORD = None
 
-
-def get_ka(url='http://icanhazip.com'):
-    r = requests.get(url, allow_redirects=False)
-    if r.status_code == 303:
-        ka_url = r.headers['Location']
-        return requests.get(ka_url)
+TIMEOUT = 60  # seconds
+TEST_URL = 'http://icanhazip.com'
 
 
-def access_ka(ka):
-    magic = ka.url.split('?')[-1]
-    username = USERNAME
-    password = PASSWORD
-    url = '/'.join(ka.url.split('/')[:-1]) + '/'
-    ka_page = requests.post(url, data={
-        '4Tredir': 'http://icanhazip.com',
+def get_auth_page():
+    page = requests.get(TEST_URL, allow_redirects=False)
+    if page.status_code == 303:
+        auth_url = r.headers['Location']
+        auth_page = requests.get(auth_url)
+        return auth_page
+
+
+def authorize(auth_page):
+    magic = auth_page.url.split('?')[-1]
+    action_url = '/'.join(ka.url.split('/')[:-1]) + '/'
+    page = requests.post(url, data={
+        '4Tredir': TEST_URl,
         'magic': magic,
-        'username': username,
-        'password': password,
+        'username': USERNAME,
+        'password': PASSWORD,
     })
-    return ka_page, magic
+    return page, magic
 
 
-def get_page():
-    ka = get_ka()
-    ka_page, magic = access_ka(ka)
-    return ka_page, magic
+def get_terms_page():
+    auth_page = get_auth_page()
+    terms_page, magic = authorize(auth_page)
+    return terms_page, magic
 
 
-def main():
-    get_page()
-    page, magic = get_page()
-    ret = requests.post(page.url, data={
+def agree_terms():
+    get_terms_page()
+    terms_page, magic = get_terms_page()
+    keepalive_page = requests.post(terms_page.url, data={
         '4Tredir': 'http://icanhazip.com',
         'magic': magic,
         'answer': '1',
     })
-    return ret
+    return keepalive_page
 
 
-def read_auth():
-    global USERNAME
-    global PASSWORD
-    USERNAME = input('username: ')
-    PASSWORD = getpass('password: ')
-
-
-def newmain():
-    ka = main()
-    html = ka.content.decode('utf-8').splitlines()
+def keepalive_loop():
+    ka_page = agree_terms()
+    html = ka_page.content.decode('utf-8').splitlines()
     for line in reversed(html):
         if 'keepalive' in line:
             ka_url = line.split('"')[1]
             break
     while True:
         requests.get(ka_url)
-        sleep(60)
+        sleep(TIMEOUT)
+
+
+def read_auth():
+    global USERNAME
+    global PASSWORD
+    if USERNAME is None:
+        USERNAME = input('username: ')
+    else:
+        print('username:', USERNAME)
+    if PASSWORD is None:
+        PASSWORD = getpass('password: ')
 
 
 if __name__ == '__main__':
     read_auth()
-    newmain()
+    keepalive_loop()
