@@ -14,7 +14,13 @@ TEST_URL = 'http://icanhazip.com'
 
 
 def get_auth_page():
-    page = requests.get(TEST_URL, allow_redirects=False)
+    while True:
+        try:
+            page = requests.get(TEST_URL, allow_redirects=False)
+        except requests.exceptions.ConnectionError:
+            sleep(1)
+        else:
+            break
     if page.status_code == 303:
         auth_url = page.headers['Location']
         auth_page = requests.get(auth_url)
@@ -78,4 +84,7 @@ def read_auth():
 
 if __name__ == '__main__':
     read_auth()
-    keepalive_loop()
+    try:
+        keepalive_loop()
+    except KeyboardInterrupt:
+        exit(0)
