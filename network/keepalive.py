@@ -16,16 +16,16 @@ TEST_URL = 'http://icanhazip.com'
 def get_auth_page():
     page = requests.get(TEST_URL, allow_redirects=False)
     if page.status_code == 303:
-        auth_url = r.headers['Location']
+        auth_url = page.headers['Location']
         auth_page = requests.get(auth_url)
         return auth_page
 
 
 def authorize(auth_page):
     magic = auth_page.url.split('?')[-1]
-    action_url = '/'.join(ka.url.split('/')[:-1]) + '/'
-    page = requests.post(url, data={
-        '4Tredir': TEST_URl,
+    action_url = '/'.join(auth_page.url.split('/')[:-1]) + '/'
+    page = requests.post(action_url, data={
+        '4Tredir': TEST_URL,
         'magic': magic,
         'username': USERNAME,
         'password': PASSWORD,
@@ -35,6 +35,9 @@ def authorize(auth_page):
 
 def get_terms_page():
     auth_page = get_auth_page()
+    while auth_page is None:
+        sleep(1)
+        auth_page = get_auth_page()
     terms_page, magic = authorize(auth_page)
     return terms_page, magic
 
